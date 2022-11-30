@@ -68,7 +68,7 @@ public class NatureVRScentController : MonoBehaviour
     // Invoked when a line of data is received from the serial device.
     void OnMessageArrived(string msg)
     {
-        Debug.Log("Micro bit received message: " + msg);
+        Debug.Log(msg);
     }
 
     // Invoked when a connect/disconnect event occurs. The parameter 'success'
