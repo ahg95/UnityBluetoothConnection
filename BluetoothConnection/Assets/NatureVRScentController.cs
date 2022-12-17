@@ -12,20 +12,27 @@ public class NatureVRScentController : MonoBehaviour
     [Tooltip("The head of the player, which will be used to calculate the distance to sources of scent.")]
     public Transform PlayerHead;
     
-    [Tooltip("The sources of scent. The strongest scent is inside the collider.")]
-    public Collider[] ScentSourceColliders;
+    [Tooltip("Sources of the Lavender scent.")]
+    public Collider[] LavenderColliders;
 
+    [Tooltip("Sources of the Cedar scent.")]
+    public Collider[] CedarColliders;
+    
     [Range(0, 5)]
-    [Tooltip("Determines how quickly the strength of the scent falls of with distance. For example, a value of 1 means that at a distance of 1 there will be no scent.")]
-    public float WeakestScentMinimumDistance = 1;
+    [Tooltip("If the player is further away from a scent source than this value then they cannot smell it.")]
+    public float ScentRadius = 1;
+    
+    [Range(0, 5)]
+    [Tooltip("If the player is closer to a scent source than this value then they get the strongest smell.")]
+    public float MaximumScentRadius = 0.25f;
 
     [Range(0, 180)]
     [Tooltip("The angle of the servo motor at which the scent source is closest to the player's nose.")]
-    public float ClosestServoAngle = 0;
+    public float MinimumServoAngle = 0;
     
     [Range(0, 180)]
     [Tooltip("The angle of the servo motor at which the scent source is furthest from the player's nose.")]
-    public float FurthestServoAngle = 180;
+    public float MaximumServoAngle = 180;
     
     [Range(0.01f, 1)]
     [Tooltip("How much time should elapse before the next update of the servo motor.")]
@@ -40,27 +47,40 @@ public class NatureVRScentController : MonoBehaviour
     {
         while (true)
         {
-            float scentStrength = 0;
-
+            // Lavender scent strength calculation
+            
             Vector3 playerHeadPosition = PlayerHead.transform.position;
             
-            foreach (var collider in ScentSourceColliders)
+            // Minimum scent strength: 0
+            // Maximum scent strength: 1
+            float lavenderScentStrength = 0;
+            float cedarScentStrength = 0;
+            
+            foreach (var collider in LavenderColliders)
+            {
+                Vector3 closestPoint = collider.ClosestPoint(playerHeadPosition);
+                
+                float scentDistance = Vector3.Distance(playerHeadPosition, closestPoint);
+
+                lavenderScentStrength += Mathf.Max(0, (ScentRadius - scentDistance) / (ScentRadius - MaximumScentRadius));
+            }
+            
+            foreach (var collider in CedarColliders)
             {
                 Vector3 closestPoint = collider.ClosestPoint(playerHeadPosition);
                 
                 float scentDistance = Vector3.Distance(playerHeadPosition, closestPoint);
                 
-                scentStrength += Mathf.Clamp((WeakestScentMinimumDistance - scentDistance) / WeakestScentMinimumDistance, 0, 1);
+                cedarScentStrength += Mathf.Max(0, (ScentRadius - scentDistance) / (ScentRadius - MaximumScentRadius));
             }
 
-            scentStrength = Mathf.Clamp(scentStrength, 0, 1);
-
-            float servoAngle = Mathf.Lerp(FurthestServoAngle, ClosestServoAngle, scentStrength);
-
-            Debug.Log("Set servo to angle " + servoAngle);
-        
-            SerialController.SendSerialMessage(servoAngle.ToString());
+            float lavenderServoAngle = Mathf.Lerp(MinimumServoAngle, MaximumServoAngle, lavenderScentStrength);
+            float cedarServoAngle = Mathf.Lerp(MaximumServoAngle, MinimumServoAngle, cedarScentStrength);
             
+            Debug.Log($"Setting lavender: {lavenderServoAngle}, cedar: {cedarServoAngle}");
+
+            SerialController.SendSerialMessage($"{lavenderServoAngle},{cedarServoAngle}");
+
             yield return new WaitForSeconds(TimeBetweenUpdates);
         }
     }
@@ -68,7 +88,7 @@ public class NatureVRScentController : MonoBehaviour
     // Invoked when a line of data is received from the serial device.
     void OnMessageArrived(string msg)
     {
-        Debug.Log(msg);
+        Debug.Log($"Received serial message: {msg}");
     }
 
     // Invoked when a connect/disconnect event occurs. The parameter 'success'
